@@ -35,6 +35,18 @@ type AidRequest record {|
     string? created_at;
 |};
 
+// Internal row type used for DB streaming
+type Row record {|
+    string id;
+    string user_id;
+    string title;
+    string? description;
+    string? category;
+    int urgency_level;
+    string? status;
+    string? created_at;
+|};
+
 function extractUserId(string authorization) returns string|error {
     if !authorization.startsWith("Bearer ") { return error("unauthorized"); }
     string token = authorization.substring(7);
@@ -49,21 +61,18 @@ service / on aidListener {
     resource function post aid_requests(@http:Header string authorization, @http:Payload CreateAidRequest req) returns json|error {
         string userId = check extractUserId(authorization);
     int urgency = req.urgency_level ?: 0;
-    sql:ParameterizedQuery q = `INSERT INTO aid_requests (user_id, title, description, category, urgency_level) VALUES (${userId}, ${req.title}, ${req.description}, ${req.category}, ${urgency}) RETURNING id, user_id, title, description, category, urgency_level, status, created_at`;
+    sql:ParameterizedQuery q = `INSERT INTO aid_requests (user_id, title, description, category, urgency_level) VALUES (CAST(${userId} AS UUID), ${req.title}, ${req.description}, ${req.category}, ${urgency}) RETURNING id, user_id, title, description, category, urgency_level, status, created_at`;
     record {string id; string user_id; string title; string? description; string? category; int urgency_level; string? status; string? created_at;} row = check dbClient->queryRow(q);
         return { id: row.id, user_id: row.user_id, title: row.title, description: row.description, category: row.category, urgency_level: row.urgency_level, status: row.status, created_at: row.created_at };
     }
 
     resource function get aid_requests() returns json|error {
-    stream<record {string id; string user_id; string title; string? description; string? category; int urgency_level; string? status; string? created_at;}, sql:Error?> rs = dbClient->query(`SELECT id, user_id, title, description, category, urgency_level, status, created_at FROM aid_requests ORDER BY created_at DESC LIMIT 100`);
+        stream<Row, sql:Error?> rs = dbClient->query(`SELECT id, user_id, title, description, category, urgency_level, status, created_at FROM aid_requests ORDER BY created_at DESC LIMIT 100`);
         json[] out = [];
-        while true {
-            var n = rs.next();
-            if n is () { break; }
-            if n is record {string id; string user_id; string title; string? description; string? category; int urgency_level; string? status; string? created_at;} rec {
-                out.push({ id: rec.id, user_id: rec.user_id, title: rec.title, description: rec.description, category: rec.category, urgency_level: rec.urgency_level, status: rec.status, created_at: rec.created_at });
-            } else if n is sql:Error err { return err; }
-        }
+        error? e = rs.forEach(function(Row r) {
+            out.push({ id: r.id, user_id: r.user_id, title: r.title, description: r.description, category: r.category, urgency_level: r.urgency_level, status: r.status, created_at: r.created_at });
+        });
+        if e is error { return e; }
         return out;
     }
 }
