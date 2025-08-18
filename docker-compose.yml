@@ -1,0 +1,135 @@
+version: '3.8'
+services:
+  postgresql:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  mongodb:
+    image: mongo:7-jammy
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      xpack.security.enabled: "false"
+      discovery.type: single-node
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+
+  auth-service:
+    build: ./backend/services/auth-service
+    depends_on:
+      - postgresql
+    environment:
+      DATABASE_HOST: postgresql
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: password
+      DATABASE_NAME: postgres
+      JWT_SECRET: devsecret
+    ports:
+      - "8081:8081"
+
+  aid-request-service:
+    build: ./backend/services/aid-request-service
+    depends_on:
+      - postgresql
+      - auth-service
+    environment:
+      DATABASE_HOST: postgresql
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: password
+      DATABASE_NAME: postgres
+      JWT_SECRET: devsecret
+    ports:
+      - "8082:8082"
+
+  gateway-service:
+    build: ./backend/services/gateway-service
+    depends_on:
+      - auth-service
+      - aid-request-service
+    environment:
+      AUTH_BASE_URL: http://auth-service:8081
+      AID_BASE_URL: http://aid-request-service:8082
+    ports:
+      - "8080:8080"
+
+  donor-management-service:
+    build: ./backend/services/donor-management-service
+    ports:
+      - "8083:8083"
+
+  volunteer-coordination-service:
+    build: ./backend/services/volunteer-coordination-service
+    ports:
+      - "8084:8084"
+
+  resource-matching-service:
+    build: ./backend/services/resource-matching-service
+    ports:
+      - "8085:8085"
+
+  notification-service:
+    build: ./backend/services/notification-service
+    ports:
+      - "8086:8086"
+
+  location-service:
+    build: ./backend/services/location-service
+    ports:
+      - "8087:8087"
+
+  analytics-service:
+    build: ./backend/services/analytics-service
+    ports:
+      - "8088:8088"
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
+  elasticsearch_data:
