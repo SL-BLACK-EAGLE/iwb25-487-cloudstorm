@@ -63,23 +63,53 @@ type DonationRow record {|
 
 type DonorTotalRow record {| decimal total_contributed; |};
 
+// Safely extract string array categories from a json/json[] value returned by DB
+function extractCategories(json? j) returns string[]? {
+    if j is json[] {
+        string[] acc = [];
+        foreach var item in j { if item is string { acc.push(item); } }
+        if acc.length() > 0 { return acc; }
+    }
+    return ();
+}
+
 service /donors on donorListener {
     resource function post .(@http:Payload record {|string name; string? email?; string? phone?; string? organization?; string[] categories?;|} body) returns json|error {
         string id = uuid:createType1AsString();
-    string? categoriesStr = () ;
-    if body?.categories is string[] { categoriesStr = (<json>body?.categories).toJsonString(); }
-    sql:ParameterizedQuery q = `INSERT INTO donors (id, name, email, phone, organization, categories) VALUES (CAST(${id} AS UUID), ${body.name}, ${body?.email}, ${body?.phone}, ${body?.organization}, ${categoriesStr}) RETURNING id, name, email, phone, organization, categories, total_contributed, created_at`;
-    DonorRow row = check dbClient->queryRow(q, DonorRow);
-    string[]? cats = row.categories is json ? <string[]?>row.categories : ();
+        // Prepare categories JSON param only if provided to avoid previous jsonb/varchar mismatch.
+        // We'll serialize categories to a string (JSON text) because the current SQL client version binds strings cleanly.
+        string? catsJsonText = ();
+        if body?.categories is string[] {
+            catsJsonText = (<json> body.categories).toJsonString();
+        }
+        sql:ParameterizedQuery q = `INSERT INTO donors (id, name, email, phone, organization, categories)
+            VALUES (CAST(${id} AS UUID), ${body.name}, ${body?.email}, ${body?.phone}, ${body?.organization}, CAST(${catsJsonText} AS JSONB))
+            RETURNING id, name, email, phone, organization, COALESCE(categories, '[]'::jsonb) AS categories, total_contributed, created_at`;
+        var qRes = dbClient->queryRow(q, DonorRow);
+        if qRes is sql:Error {
+            string emsg = qRes.message();
+            if emsg.indexOf("duplicate key value") >= 0 && emsg.indexOf("email") >= 0 {
+                return { error: "email_conflict", field: "email", message: "Email already exists" };
+            }
+            return qRes;
+        }
+        DonorRow row = <DonorRow> qRes;
+        string[]? cats = extractCategories(row.categories);
     json resp = { id: row.id, name: row.name, email: row.email, phone: row.phone, organization: row.organization, categories: cats, total_contributed: row.total_contributed, created_at: row.created_at };
     return resp;
     }
 
     resource function get .() returns json|error {
-        stream<record {string id; string name; string? email; string? phone; string? organization; json? categories; decimal total_contributed; string? created_at;}, sql:Error?> rs = dbClient->query(`SELECT id, name, email, phone, organization, categories, total_contributed, created_at FROM donors ORDER BY created_at DESC LIMIT 200`);
+        stream<record {string id; string name; string? email; string? phone; string? organization; json? categories; decimal total_contributed; string? created_at;}, sql:Error?> rs = dbClient->query(`SELECT id, name, email, phone, organization, COALESCE(categories, '[]'::jsonb) AS categories, total_contributed, created_at FROM donors ORDER BY created_at DESC LIMIT 200`);
         json[] out = [];
         error? e = rs.forEach(function(record {string id; string name; string? email; string? phone; string? organization; json? categories; decimal total_contributed; string? created_at;} r) {
-            string[]? cats = r.categories is json ? <string[]?>r.categories : ();
+            string[]? cats = ();
+            if r.categories is json[] {
+                json[] arr = <json[]> r.categories;
+                string[] tmp = [];
+                foreach var j in arr { if j is string { tmp.push(j); } }
+                if tmp.length() > 0 { cats = tmp; }
+            }
             out.push({ id: r.id, name: r.name, email: r.email, phone: r.phone, organization: r.organization, categories: cats, total_contributed: r.total_contributed, created_at: r.created_at });
         });
         if e is error { return e; }
@@ -87,10 +117,16 @@ service /donors on donorListener {
     }
 
     resource function get [string id]() returns json|error {
-        sql:ParameterizedQuery q = `SELECT id, name, email, phone, organization, categories, total_contributed, created_at FROM donors WHERE id = CAST(${id} AS UUID)`;
+        sql:ParameterizedQuery q = `SELECT id, name, email, phone, organization, COALESCE(categories, '[]'::jsonb) AS categories, total_contributed, created_at FROM donors WHERE id = CAST(${id} AS UUID)`;
         var row = dbClient->queryRow(q, DonorRow);
     if row is DonorRow {
-            string[]? cats = row.categories is json ? <string[]?>row.categories : ();
+            string[]? cats = ();
+            if row.categories is json[] {
+                json[] arr = <json[]> row.categories;
+                string[] temp = [];
+                foreach var it in arr { if it is string { temp.push(it); } }
+                if temp.length() > 0 { cats = temp; }
+            }
             json resp = { id: row.id, name: row.name, email: row.email, phone: row.phone, organization: row.organization, categories: cats, total_contributed: row.total_contributed, created_at: row.created_at };
             return resp;
         } else if row is sql:NoRowsError {
@@ -123,5 +159,23 @@ service /donors on donorListener {
         });
         if e is error { return e; }
         return { donation_history: list };
+    }
+
+    // Update donor categories (replace existing set)
+    resource function put [string id]/categories(@http:Payload record {| string[] categories?; |} body) returns json|error {
+        string? catsJsonText = ();
+        if body?.categories is string[] {
+            catsJsonText = (<json> body.categories).toJsonString();
+        }
+        sql:ParameterizedQuery q = `UPDATE donors SET categories = CAST(${catsJsonText} AS JSONB) WHERE id = CAST(${id} AS UUID) RETURNING id, name, email, phone, organization, COALESCE(categories, '[]'::jsonb) AS categories, total_contributed, created_at`;
+        var res = dbClient->queryRow(q, DonorRow);
+        if res is DonorRow {
+            string[]? cats = extractCategories(res.categories);
+            return { id: res.id, name: res.name, email: res.email, phone: res.phone, organization: res.organization, categories: cats, total_contributed: res.total_contributed, created_at: res.created_at };
+        } else if res is sql:NoRowsError {
+            return { error: "not_found" };
+        } else if res is sql:Error {
+            return res;
+        }
     }
 }

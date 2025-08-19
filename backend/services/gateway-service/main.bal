@@ -65,6 +65,12 @@ service / on gatewayListener {
         return check resp.getJsonPayload();
     }
 
+    resource function put donors/[string id]/categories(@http:Payload json body) returns json|error|http:Response {
+        http:Response resp = check donorClient->put(string `/donors/${id}/categories`, body);
+        if resp.statusCode == 409 { return resp; }
+        return check resp.getJsonPayload();
+    }
+
     // Volunteer & tasks proxy
     resource function post volunteers(@http:Payload json body) returns json|error {
         http:Response resp = check volunteerClient->post("/volunteers", body);
