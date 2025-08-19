@@ -4,7 +4,7 @@ import ballerinax/postgresql;
 import ballerina/crypto;
 import ballerina/time;
 import ballerina/os;
-import smartrelief.shared.errors as serr;
+// (Shared errors module integration deferred; using local definition)
 // (no extra util imports required)
 
 // Environment configuration (simple approach using runtime: getEnv)
@@ -36,9 +36,8 @@ type LoginRequest record {|
 
 type User record {| string id; string email; string role; |};
 
-// Shared error type/constructor
-type ErrorResp serr:ErrorResp;
-function err(string code, string message, string? fieldName = ()) returns ErrorResp { return serr:err(code, message, fieldName); }
+type ErrorResp record {| string code; string message; string? fieldName; |};
+function err(string code, string message, string? fieldName = ()) returns ErrorResp { return { code, message, fieldName }; }
 
 // Simple metrics counters
 int registerCount = 0;

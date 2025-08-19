@@ -138,6 +138,15 @@ services:
     ports:
       - "8086:8086"
 
+  notification-ws-service:
+    build: ./backend/services/notification-ws-service
+    depends_on:
+      - notification-service
+    environment:
+      NOTIFICATION_BASE: http://notification-service:8086/notifications
+    ports:
+      - "8090:8090"
+
   location-service:
     build: ./backend/services/location-service
     ports:

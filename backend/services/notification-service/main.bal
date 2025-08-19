@@ -15,7 +15,6 @@ type Notification record {|
 
 Notification[] queue = [];
 
-// Unified error + metrics
 type ErrorResp record {| string code; string message; string? fieldName; |};
 function err(string code, string message, string? fieldName = ()) returns ErrorResp { return { code, message, fieldName }; }
 
@@ -28,7 +27,7 @@ service /notifications on notificationListener {
     resource function post email(@http:Payload record {| string to; string subject; string message; |} body) returns json|ErrorResp {
         if body.to.trim().length() == 0 { return err("invalid_input", "Recipient required", "to"); }
         Notification n = { id: uuid:createType1AsString(), channel: "email", to: body.to, subject: body.subject, message: body.message, status: "queued" };
-        queue = [...queue, n];
+        queue.push(n);
         log:printInfo("Queued email to " + body.to);
         emailQueuedCount = emailQueuedCount + 1;
         return { queued: true, id: n.id };
@@ -37,7 +36,7 @@ service /notifications on notificationListener {
     resource function post sms(@http:Payload record {| string to; string message; |} body) returns json|ErrorResp {
         if body.to.trim().length() == 0 { return err("invalid_input", "Recipient required", "to"); }
         Notification n = { id: uuid:createType1AsString(), channel: "sms", to: body.to, message: body.message, status: "queued" };
-        queue = [...queue, n];
+        queue.push(n);
         log:printInfo("Queued sms to " + body.to);
         smsQueuedCount = smsQueuedCount + 1;
         return { queued: true, id: n.id };
@@ -50,3 +49,4 @@ service /notifications on notificationListener {
             string `notification_sms_queued_total ${smsQueuedCount}`;
     }
 }
+

@@ -46,9 +46,6 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "time"}
 ]
-modules = [
-	{org = "ballerina", packageName = "crypto", moduleName = "crypto"}
-]
 
 [[package]]
 org = "ballerina"
@@ -160,15 +157,6 @@ dependencies = [
 
 [[package]]
 org = "ballerina"
-name = "lang.error"
-version = "0.0.0"
-scope = "testOnly"
-dependencies = [
-	{org = "ballerina", name = "jballerina.java"}
-]
-
-[[package]]
-org = "ballerina"
 name = "lang.int"
 version = "0.0.0"
 dependencies = [
@@ -272,20 +260,6 @@ modules = [
 
 [[package]]
 org = "ballerina"
-name = "sql"
-version = "1.16.0"
-dependencies = [
-	{org = "ballerina", name = "io"},
-	{org = "ballerina", name = "jballerina.java"},
-	{org = "ballerina", name = "lang.object"},
-	{org = "ballerina", name = "time"}
-]
-modules = [
-	{org = "ballerina", packageName = "sql", moduleName = "sql"}
-]
-
-[[package]]
-org = "ballerina"
 name = "task"
 version = "2.11.0"
 dependencies = [
@@ -296,27 +270,10 @@ dependencies = [
 
 [[package]]
 org = "ballerina"
-name = "test"
-version = "0.0.0"
-scope = "testOnly"
-dependencies = [
-	{org = "ballerina", name = "jballerina.java"},
-	{org = "ballerina", name = "lang.array"},
-	{org = "ballerina", name = "lang.error"}
-]
-modules = [
-	{org = "ballerina", packageName = "test", moduleName = "test"}
-]
-
-[[package]]
-org = "ballerina"
 name = "time"
 version = "2.7.0"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"}
-]
-modules = [
-	{org = "ballerina", packageName = "time", moduleName = "time"}
 ]
 
 [[package]]
@@ -337,8 +294,28 @@ dependencies = [
 	{org = "ballerina", name = "lang.int"},
 	{org = "ballerina", name = "time"}
 ]
+
+[[package]]
+org = "ballerina"
+name = "websocket"
+version = "2.14.0"
+dependencies = [
+	{org = "ballerina", name = "auth"},
+	{org = "ballerina", name = "constraint"},
+	{org = "ballerina", name = "http"},
+	{org = "ballerina", name = "io"},
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "jwt"},
+	{org = "ballerina", name = "lang.array"},
+	{org = "ballerina", name = "lang.runtime"},
+	{org = "ballerina", name = "lang.string"},
+	{org = "ballerina", name = "lang.value"},
+	{org = "ballerina", name = "log"},
+	{org = "ballerina", name = "oauth2"},
+	{org = "ballerina", name = "time"}
+]
 modules = [
-	{org = "ballerina", packageName = "uuid", moduleName = "uuid"}
+	{org = "ballerina", packageName = "websocket", moduleName = "websocket"}
 ]
 
 [[package]]
@@ -354,48 +331,16 @@ modules = [
 ]
 
 [[package]]
-org = "ballerinax"
-name = "cdc"
-version = "1.0.3"
-dependencies = [
-	{org = "ballerina", name = "crypto"},
-	{org = "ballerina", name = "data.jsondata"},
-	{org = "ballerina", name = "jballerina.java"},
-	{org = "ballerinai", name = "observe"}
-]
-
-[[package]]
-org = "ballerinax"
-name = "postgresql"
-version = "1.16.1"
-dependencies = [
-	{org = "ballerina", name = "crypto"},
-	{org = "ballerina", name = "io"},
-	{org = "ballerina", name = "jballerina.java"},
-	{org = "ballerina", name = "sql"},
-	{org = "ballerina", name = "time"},
-	{org = "ballerinax", name = "cdc"}
-]
-modules = [
-	{org = "ballerinax", packageName = "postgresql", moduleName = "postgresql"}
-]
-
-[[package]]
 org = "smartrelief"
-name = "auth_service"
+name = "notification_ws_service"
 version = "0.1.0"
 dependencies = [
-	{org = "ballerina", name = "crypto"},
 	{org = "ballerina", name = "http"},
 	{org = "ballerina", name = "os"},
-	{org = "ballerina", name = "sql"},
-	{org = "ballerina", name = "test"},
-	{org = "ballerina", name = "time"},
-	{org = "ballerina", name = "uuid"},
-	{org = "ballerinai", name = "observe"},
-	{org = "ballerinax", name = "postgresql"}
+	{org = "ballerina", name = "websocket"},
+	{org = "ballerinai", name = "observe"}
 ]
 modules = [
-	{org = "smartrelief", packageName = "auth_service", moduleName = "auth_service"}
+	{org = "smartrelief", packageName = "notification_ws_service", moduleName = "notification_ws_service"}
 ]
 

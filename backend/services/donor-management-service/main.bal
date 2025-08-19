@@ -3,8 +3,16 @@ import ballerina/uuid;
 import ballerina/sql;
 import ballerinax/postgresql;
 import ballerina/os;
+import ballerina/log;
 
 listener http:Listener donorListener = new (8083);
+
+// Event publishing stub (Kafka integration placeholder)
+final string KAFKA_BROKERS = envOr("KAFKA_BROKERS", "");
+function publishEvent(string topic, json payload) {
+    if KAFKA_BROKERS == "" { return; }
+    log:printInfo("event_stub topic=" + topic + " payload=" + payload.toJsonString());
+}
 
 function envOr(string k, string d) returns string { string? v = os:getEnv(k); return v ?: d; }
 final string DB_HOST = envOr("DATABASE_HOST", "postgresql");
@@ -63,9 +71,8 @@ type DonationRow record {|
 
 type DonorTotalRow record {| decimal total_contributed; |};
 
-// Unified error payload type + helper
+// Unified error payload type + helper (local until shared packaging resolved)
 type ErrorResp record {| string code; string message; string? fieldName; |};
-
 function err(string code, string message, string? fieldName = ()) returns ErrorResp { return { code, message, fieldName }; }
 
 // Basic metrics (not concurrency-safe; acceptable for demo)
@@ -169,6 +176,7 @@ service /donors on donorListener {
     if totRow is record {decimal total_contributed;} { newTotal = totRow.total_contributed; }
     json respDonation = { donation_id: drow.donation_id, donor_id: drow.donor_id, amount: drow.amount, currency: drow.currency, aid_request_id: drow.aid_request_id, status: drow.status, timestamp: drow.timestamp };
     donationCreatedCount = donationCreatedCount + 1;
+    publishEvent("donation_created", { donation_id: drow.donation_id, donor_id: drow.donor_id, amount: drow.amount, currency: drow.currency, aid_request_id: drow.aid_request_id });
     return <json>{ donation: respDonation, total_contributed: newTotal };
     }
 

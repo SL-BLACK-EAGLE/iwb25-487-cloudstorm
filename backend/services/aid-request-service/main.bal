@@ -2,8 +2,17 @@ import ballerina/http;
 import ballerina/sql;
 import ballerinax/postgresql;
 import ballerina/os;
+import ballerina/log;
 
 listener http:Listener aidListener = new (8082);
+
+// Event publishing stub (Kafka integration placeholder)
+final string KAFKA_BROKERS = envOr("KAFKA_BROKERS", "");
+
+function publishEvent(string topic, json payload) {
+    if KAFKA_BROKERS == "" { return; }
+    log:printInfo("event_stub topic=" + topic + " payload=" + payload.toJsonString());
+}
 
 function envOr(string k, string d) returns string { string? v = os:getEnv(k); return v ?: d; }
 final string DB_HOST = envOr("DATABASE_HOST", "postgresql");
@@ -35,9 +44,8 @@ type AidRequest record {|
     string? created_at;
 |};
 
-// Unified error payload
+// Unified error payload (local until shared package resolution works)
 type ErrorResp record {| string code; string message; string? fieldName; |};
-
 function err(string code, string message, string? fieldName = ()) returns ErrorResp { return { code, message, fieldName }; }
 
 // Simple metric counter (non-concurrent demo)
@@ -72,6 +80,8 @@ service / on aidListener {
     sql:ParameterizedQuery q = `INSERT INTO aid_requests (user_id, title, description, category, urgency_level) VALUES (CAST(${userId} AS UUID), ${req.title}, ${req.description}, ${req.category}, ${urgency}) RETURNING id, user_id, title, description, category, urgency_level, status, created_at`;
     record {string id; string user_id; string title; string? description; string? category; int urgency_level; string? status; string? created_at;} row = check dbClient->queryRow(q);
     aidCreatedCount = aidCreatedCount + 1;
+        // Emit event (stub)
+        publishEvent("aid_request_created", { id: row.id, user_id: row.user_id, title: row.title, category: row.category, urgency_level: row.urgency_level });
         return { id: row.id, user_id: row.user_id, title: row.title, description: row.description, category: row.category, urgency_level: row.urgency_level, status: row.status, created_at: row.created_at };
     }
 
