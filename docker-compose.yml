@@ -122,6 +122,14 @@ services:
 
   resource-matching-service:
     build: ./backend/services/resource-matching-service
+    depends_on:
+      - postgresql
+    environment:
+      DATABASE_HOST: postgresql
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: password
+      DATABASE_NAME: postgres
     ports:
       - "8085:8085"
 
@@ -137,6 +145,14 @@ services:
 
   analytics-service:
     build: ./backend/services/analytics-service
+    depends_on:
+      - postgresql
+    environment:
+      DATABASE_HOST: postgresql
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: password
+      DATABASE_NAME: postgres
     ports:
       - "8088:8088"
 

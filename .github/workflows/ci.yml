@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, ishara ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ballerina
+        run: |
+          wget https://dist.ballerina.io/downloads/2201.9.0/ballerina-2201.9.0-swan-lake-linux-x64.deb
+          sudo dpkg -i ballerina-2201.9.0-swan-lake-linux-x64.deb
+          bal version
+      - name: Init DB schema
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          PGPASSWORD=password psql -h localhost -U postgres -d postgres -f scripts/init-db.sql
+      - name: Test Auth Service
+        run: cd backend/services/auth-service && bal test
+      - name: Test Donor Service
+        run: cd backend/services/donor-management-service && bal test
+      - name: Test Aid Request Service
+        run: cd backend/services/aid-request-service && bal test
+      - name: Test Matching Service
+        run: cd backend/services/resource-matching-service && bal test

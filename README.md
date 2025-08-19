@@ -30,4 +30,45 @@ npm install
 npm run dev
 ```
 
-Status: Phase 1 core auth + aid request persistence implemented (baseline). Remaining phases (donor, volunteer, matching, notifications, location, analytics, frontend build-out, testing, observability, deployment) pending per project plan.
+## Current Status
+
+Implemented services (baseline functional):
+- Auth Service (register/login/profile)
+- Aid Request Service (create/list aid requests)
+- Donor Management Service (create/list/get donors, donations, history, update categories, duplicate email handling)
+- Volunteer Coordination Service (volunteers CRUD-lite, tasks, assignment)
+- Resource Matching Service (suggestions by category overlap)
+- Notification Service (in-memory email/sms queue)
+- Location Service (stub geocode + recent cache)
+- Analytics Service (summary counts + totals)
+- Gateway Service (proxies all above)
+- Admin Dashboard (Next.js dev UI skeleton)
+
+Core Gateway Endpoints (http://localhost:8080):
+- GET  /health
+- POST /auth/register
+- POST /auth/login
+- GET  /auth/profile
+- GET  /aid/requests
+- POST /aid/requests
+- POST /donors
+- GET  /donors
+- GET  /donors/{id}
+- POST /donors/{id}/donations
+- GET  /donors/{id}/history
+- PUT  /donors/{id}/categories
+- GET  /matching/suggestions
+- POST /notifications/email
+- POST /notifications/sms
+- GET  /notifications/queue
+- POST /locations/geocode
+- GET  /locations/recent
+- GET  /analytics/summary
+
+Next potential enhancements (not yet implemented):
+- Real email/SMS integration
+- WebSocket push notifications
+- Kafka event pipeline
+- Redis caching for frequently accessed queries
+- Proper JWT verification & roles
+- Tests & monitoring dashboards

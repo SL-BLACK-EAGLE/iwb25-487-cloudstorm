@@ -35,6 +35,14 @@ type AidRequest record {|
     string? created_at;
 |};
 
+// Unified error payload
+type ErrorResp record {| string code; string message; string? fieldName; |};
+
+function err(string code, string message, string? fieldName = ()) returns ErrorResp { return { code, message, fieldName }; }
+
+// Simple metric counter (non-concurrent demo)
+int aidCreatedCount = 0;
+
 // Internal row type used for DB streaming
 type Row record {|
     string id;
@@ -59,10 +67,11 @@ function extractUserId(string authorization) returns string|error {
 
 service / on aidListener {
     resource function post aid_requests(@http:Header string authorization, @http:Payload CreateAidRequest req) returns json|error {
-        string userId = check extractUserId(authorization);
+    string userId = check extractUserId(authorization);
     int urgency = req.urgency_level ?: 0;
     sql:ParameterizedQuery q = `INSERT INTO aid_requests (user_id, title, description, category, urgency_level) VALUES (CAST(${userId} AS UUID), ${req.title}, ${req.description}, ${req.category}, ${urgency}) RETURNING id, user_id, title, description, category, urgency_level, status, created_at`;
     record {string id; string user_id; string title; string? description; string? category; int urgency_level; string? status; string? created_at;} row = check dbClient->queryRow(q);
+    aidCreatedCount = aidCreatedCount + 1;
         return { id: row.id, user_id: row.user_id, title: row.title, description: row.description, category: row.category, urgency_level: row.urgency_level, status: row.status, created_at: row.created_at };
     }
 
@@ -74,5 +83,9 @@ service / on aidListener {
         });
         if e is error { return e; }
         return out;
+    }
+
+    resource function get metrics() returns string {
+    return string `aid_requests_created_total ${aidCreatedCount}`;
     }
 }
