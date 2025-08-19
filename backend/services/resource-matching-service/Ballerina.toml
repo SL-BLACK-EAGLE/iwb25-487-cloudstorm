@@ -3,6 +3,11 @@ org = "smartrelief"
 name = "resource_matching_service"
 version = "0.1.0"
 
+[[dependency]]
+org = "smartrelief"
+name = "shared"
+version = "0.1.0"
+
 [build-options]
 observabilityIncluded = true
 
