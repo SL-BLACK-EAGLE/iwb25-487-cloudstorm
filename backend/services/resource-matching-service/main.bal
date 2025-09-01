@@ -4,7 +4,7 @@ import ballerinax/postgresql;
 import ballerina/os;
 import ballerina/time;
 import ballerina/log;
-import smartrelief/shared;
+import ballerina/uuid;
 
 listener http:Listener matchListener = new (8085);
 
@@ -31,9 +31,9 @@ type DonorPref record {|
     json? categories;
 |};
 
-// Use shared ErrorResp + helpers
-type ErrorResp shared:ErrorResp;
-function err(string code, string message, string? fieldName = ()) returns ErrorResp { return shared:err(code, message, fieldName); }
+// Local error payload
+type ErrorResp record {| string code; string message; string? fieldName; |};
+function err(string code, string message, string? fieldName = ()) returns ErrorResp { return { code, message, fieldName }; }
 
 int suggestionCalcCount = 0;
 json? lastSuggestionsCache = ();
@@ -46,26 +46,45 @@ int duration_lt_5s = 0;
 int duration_ge_5s = 0;
 
 // Use shared structured logger
-function logJson(string level, string msg, map<anydata>? fields = (), string cid = "") {
-    string useCid = cid.length() > 0 ? cid : shared:correlationId();
-    map<anydata> f = fields is map<anydata> ? fields : {};
-    f["svc"] = "resource-matching-service";
-    shared:logJson(level, msg, f, useCid);
+// Correlation + timing helpers (local)
+type Timer record {| int started; string cid; string op; |};
+
+function correlationId(string? incoming = ()) returns string {
+    if incoming is string && incoming.length() > 0 { return incoming; }
+    return uuid:createType4AsString();
 }
+
+function startTimer(string op, string cid = correlationId()) returns Timer { return { started: time:utcNow()[0], cid, op }; }
+
+function endTimer(Timer t, map<anydata>? extra = ()) returns string {
+    int elapsed = time:utcNow()[0] - t.started;
+    string b = elapsed < 1 ? "lt_1s" : (elapsed < 5 ? "lt_5s" : "ge_5s");
+    map<anydata> m = { duration_seconds: elapsed, bucket: b, op: t.op };
+    if extra is map<anydata> { foreach var [k,v] in extra.entries() { m[k] = v; } }
+    logJson("info", "op_complete", m, t.cid);
+    return b;
+}
+
+function logJson(string level, string msg, map<anydata>? fields = (), string cid = "") {
+    string useCid = cid.length() > 0 ? cid : correlationId();
+    map<anydata> m = { ts: time:utcNow()[0], level: level, msg: msg, cid: useCid, svc: "resource-matching-service" };
+    if fields is map<anydata> { foreach var [k,v] in fields.entries() { m[k] = v; } }
+    json j = <json>m;
+    if level == "error" { log:printError(j.toJsonString()); } else { log:printInfo(j.toJsonString()); }
 }
 
 service /matching on matchListener {
-    resource function get health() returns json { return { status: "ok", service: "resource-matching-service" }; }
+    resource function get health() returns json { return { status: "ok", svc: "resource-matching-service" }; }
 
     // Naive matching with basic time-based cache to reduce DB pressure.
     resource function get suggestions(@http:Header string? x_cid) returns json|error {
-        string cid = shared:correlationId(x_cid);
-        shared:Timer tm = shared:startTimer("suggestions", cid);
+        string cid = correlationId(x_cid);
+        Timer tm = startTimer("suggestions", cid);
         time:Utc t = time:utcNow();
         int now = t[0];
         if lastSuggestionsCache is json && (now - lastCacheTimestamp) < CACHE_TTL_SECONDS {
             logJson("debug", "cache_hit", { ageSeconds: now - lastCacheTimestamp }, cid);
-            string b = shared:endTimer(tm, { cache: true });
+            string b = endTimer(tm, { cache: true });
             trackBucket(b);
             return { suggestions: lastSuggestionsCache, cached: true, bucket: b };
         }
@@ -73,12 +92,20 @@ service /matching on matchListener {
         stream<record {string id; string title; string? category;}, sql:Error?> aidRs = dbClient->query(`SELECT id, title, category FROM aid_requests WHERE status = 'active' ORDER BY created_at DESC LIMIT 50`);
         AidNeed[] needs = [];
         error? e1 = aidRs.forEach(function(record {string id; string title; string? category;} r) { needs.push({ id: r.id, title: r.title, category: r.category }); });
-    if e1 is error { logJson("error", "aid_query_failed", { err: e1.message() }, cid); shared:endTimer(tm, { error: true }); return e1; }
+    if e1 is error {
+        logJson("error", "aid_query_failed", { err: e1.message() }, cid);
+    _ = endTimer(tm, { "error": true });
+        return e1;
+    }
         // Fetch donors (limit for demo)
         stream<record {string id; json? categories;}, sql:Error?> donorRs = dbClient->query(`SELECT id, categories FROM donors ORDER BY created_at DESC LIMIT 200`);
         DonorPref[] donors = [];
         error? e2 = donorRs.forEach(function(record {string id; json? categories;} r) { donors.push({ id: r.id, categories: r.categories }); });
-    if e2 is error { logJson("error", "donor_query_failed", { err: e2.message() }, cid); shared:endTimer(tm, { error: true }); return e2; }
+    if e2 is error {
+        logJson("error", "donor_query_failed", { err: e2.message() }, cid);
+    _ = endTimer(tm, { "error": true });
+        return e2;
+    }
 
         json[] matches = [];
         foreach var need in needs {
@@ -95,8 +122,8 @@ service /matching on matchListener {
         suggestionCalcCount = suggestionCalcCount + 1;
         lastSuggestionsCache = matches;
         lastCacheTimestamp = now;
-        logJson("info", "suggestions_computed", { suggestions: matches.length(), calcNo: suggestionCalcCount }, cid);
-        string b2 = shared:endTimer(tm, { suggestions: matches.length() });
+    logJson("info", "suggestions_computed", { suggestions: matches.length(), calcNo: suggestionCalcCount }, cid);
+    string b2 = endTimer(tm, { suggestions: matches.length() });
         trackBucket(b2);
         return { suggestions: matches, cached: false, bucket: b2 };
     }

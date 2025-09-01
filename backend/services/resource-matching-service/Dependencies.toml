@@ -70,7 +70,7 @@ dependencies = [
 [[package]]
 org = "ballerina"
 name = "http"
-version = "2.14.3"
+version = "2.14.4"
 dependencies = [
 	{org = "ballerina", name = "auth"},
 	{org = "ballerina", name = "cache"},
@@ -157,6 +157,15 @@ dependencies = [
 
 [[package]]
 org = "ballerina"
+name = "lang.error"
+version = "0.0.0"
+scope = "testOnly"
+dependencies = [
+	{org = "ballerina", name = "jballerina.java"}
+]
+
+[[package]]
+org = "ballerina"
 name = "lang.int"
 version = "0.0.0"
 dependencies = [
@@ -206,12 +215,15 @@ dependencies = [
 [[package]]
 org = "ballerina"
 name = "log"
-version = "2.12.0"
+version = "2.13.0"
 dependencies = [
 	{org = "ballerina", name = "io"},
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.value"},
 	{org = "ballerina", name = "observe"}
+]
+modules = [
+	{org = "ballerina", packageName = "log", moduleName = "log"}
 ]
 
 [[package]]
@@ -284,6 +296,20 @@ dependencies = [
 
 [[package]]
 org = "ballerina"
+name = "test"
+version = "0.0.0"
+scope = "testOnly"
+dependencies = [
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "lang.array"},
+	{org = "ballerina", name = "lang.error"}
+]
+modules = [
+	{org = "ballerina", packageName = "test", moduleName = "test"}
+]
+
+[[package]]
+org = "ballerina"
 name = "time"
 version = "2.7.0"
 dependencies = [
@@ -310,6 +336,9 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.int"},
 	{org = "ballerina", name = "time"}
+]
+modules = [
+	{org = "ballerina", packageName = "uuid", moduleName = "uuid"}
 ]
 
 [[package]]
@@ -357,9 +386,12 @@ name = "resource_matching_service"
 version = "0.1.0"
 dependencies = [
 	{org = "ballerina", name = "http"},
+	{org = "ballerina", name = "log"},
 	{org = "ballerina", name = "os"},
 	{org = "ballerina", name = "sql"},
+	{org = "ballerina", name = "test"},
 	{org = "ballerina", name = "time"},
+	{org = "ballerina", name = "uuid"},
 	{org = "ballerinai", name = "observe"},
 	{org = "ballerinax", name = "postgresql"}
 ]
